@@ -23,12 +23,20 @@ FIELDS = ("symbol","price","priceAvg50","priceAvg200","yearHigh","yearLow")
 def fetch_quotes():
     if not KEY:
         raise SystemExit("FMP_KEY not set")
-    url = "https://financialmodelingprep.com/api/v3/quote/%s?apikey=%s" % (",".join(TICKERS), KEY)
-    req = urllib.request.Request(url, headers={"User-Agent": "GARPify-monitor"})
-    with urllib.request.urlopen(req, timeout=25) as r:
-        data = json.loads(r.read())
-    # keep only the fields the page needs; drop the rest
-    return [{k: q.get(k) for k in FIELDS} for q in data if q.get("symbol") in TICKERS]
+    # Modern /stable/ endpoint, one symbol per call (20 calls; well under the Starter 300/min limit).
+    out = []
+    for t in TICKERS:
+        url = "https://financialmodelingprep.com/stable/quote?symbol=%s&apikey=%s" % (t, KEY)
+        req = urllib.request.Request(url, headers={"User-Agent": "GARPify-monitor"})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as r:
+                data = json.loads(r.read())
+            q = data[0] if isinstance(data, list) and data else (data if isinstance(data, dict) else {})
+            if q.get("symbol"):
+                out.append({k: q.get(k) for k in FIELDS})
+        except Exception as e:
+            print("  %s: %s" % (t, e))   # skip; it'll show up in 'missing'
+    return out
 
 def main():
     quotes = fetch_quotes()
