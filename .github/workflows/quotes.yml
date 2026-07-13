@@ -1,0 +1,20 @@
+name: refresh-quotes
+on:
+  schedule:
+    - cron: "*/15 13-21 * * 1-5"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env: { FMP_KEY: ${{ secrets.FMP_KEY }} }
+        run: python3 pull_monitor_quotes.py
+      - run: |
+          git config user.name  "monitor-bot"
+          git config user.email "bot@garpify.com"
+          git add monitor_quotes.json
+          git commit -m "quotes $(date -u +%FT%TZ)" || echo "no change"
+          git push
