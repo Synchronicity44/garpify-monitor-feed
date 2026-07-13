@@ -10,9 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - env: { FMP_KEY: ${{ secrets.FMP_KEY }} }
+      - name: pull quotes
+        env:
+          FMP_KEY: ${{ secrets.FMP_KEY }}
         run: python3 pull_monitor_quotes.py
-      - run: |
+      - name: commit
+        run: |
           git config user.name  "monitor-bot"
           git config user.email "bot@garpify.com"
           git add monitor_quotes.json
