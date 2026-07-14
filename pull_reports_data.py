@@ -30,13 +30,18 @@ def _get(url):
 def one(tk):
     q = _get(f"{FMP}/quote?symbol={tk}&apikey={KEY}")
     q = q[0] if isinstance(q, list) and q else {}
-    est = _get(f"{FMP}/analyst-estimates?symbol={tk}&period=annual&limit=2&apikey={KEY}")
+    est = _get(f"{FMP}/analyst-estimates?symbol={tk}&period=annual&limit=12&apikey={KEY}")
     fwd_eps = fwd_growth = None
     if isinstance(est, list) and est:
-        fwd_eps = est[0].get("estimatedEpsAvg") or est[0].get("epsAvg")
-        nxt = (est[1].get("estimatedEpsAvg") or est[1].get("epsAvg")) if len(est) > 1 else None
-        if fwd_eps and nxt and fwd_eps > 0:
-            fwd_growth = round((nxt / fwd_eps - 1) * 100, 1)
+        # FMP returns estimates furthest-year-first; sort to nearest-first and keep forward years only
+        ev = sorted([e for e in est if e.get("date")], key=lambda e: e["date"])
+        yr = str(datetime.date.today().year)
+        fwd = [e for e in ev if e.get("date", "")[:4] >= yr] or ev
+        eps = lambda e: e.get("epsAvg") or e.get("estimatedEpsAvg")
+        if fwd:
+            fwd_eps = eps(fwd[0])
+            if len(fwd) > 1 and fwd_eps and fwd_eps > 0 and eps(fwd[1]):
+                fwd_growth = round((eps(fwd[1]) / fwd_eps - 1) * 100, 1)
     price = q.get("price")
     return {
         "price": price,
