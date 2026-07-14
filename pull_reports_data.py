@@ -30,18 +30,18 @@ def _get(url):
 def one(tk):
     q = _get(f"{FMP}/quote?symbol={tk}&apikey={KEY}")
     q = q[0] if isinstance(q, list) and q else {}
-    est = _get(f"{FMP}/analyst-estimates?symbol={tk}&period=annual&limit=12&apikey={KEY}")
+    est = _get(f"{FMP}/analyst-estimates?symbol={tk}&period=annual&limit=10&apikey={KEY}")
     fwd_eps = fwd_growth = None
     if isinstance(est, list) and est:
-        # FMP returns estimates furthest-year-first; sort to nearest-first and keep forward years only
-        ev = sorted([e for e in est if e.get("date")], key=lambda e: e["date"])
-        yr = str(datetime.date.today().year)
-        fwd = [e for e in ev if e.get("date", "")[:4] >= yr] or ev
-        eps = lambda e: e.get("epsAvg") or e.get("estimatedEpsAvg")
-        if fwd:
-            fwd_eps = eps(fwd[0])
-            if len(fwd) > 1 and fwd_eps and fwd_eps > 0 and eps(fwd[1]):
-                fwd_growth = round((eps(fwd[1]) / fwd_eps - 1) * 100, 1)
+        # one entry per fiscal year, dated at year-end. Keep the years whose end is still
+        # in the FUTURE (the current forward fiscal year onward), nearest first.
+        today = datetime.date.today().isoformat()
+        fwd = sorted([e for e in est if e.get("date") and e.get("epsAvg")], key=lambda e: e["date"])
+        fwd = [e for e in fwd if e["date"] > today]
+        if fwd and fwd[0]["epsAvg"] > 0:
+            fwd_eps = round(fwd[0]["epsAvg"], 2)                      # next fiscal year's expected EPS
+            if len(fwd) > 1 and fwd[1].get("epsAvg"):
+                fwd_growth = round((fwd[1]["epsAvg"] / fwd_eps - 1) * 100, 1)   # next -> following year
     price = q.get("price")
     return {
         "price": price,
