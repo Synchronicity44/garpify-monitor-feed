@@ -122,7 +122,7 @@ async function load(){chips();
    const bs={};q.forEach(x=>bs[x.symbol]=x);
    let rd={};try{const rr=await fetch(REPORTS_URL,{cache:'no-store'});if(rr.ok){rd=(await rr.json()).companies||{};}}catch(e){}
    ROWS=TICKERS.map(tk=>{const m=bs[tk]||{},f=FUND[tk]||{};const price=m.price,a=m.priceAvg50,b=m.priceAvg200,hi=m.yearHigh;
-     const rc=rd[tk]||{};const fpe=(price&&rc.fwd_eps>0)?price/rc.fwd_eps:(f.pe_fwd||null);const peg=(fpe&&rc.fwd_growth>=8)?+(fpe/rc.fwd_growth).toFixed(2):null;
+     const rc=rd[tk]||{};const fpe=(price&&rc.fwd_eps>0)?price/rc.fwd_eps:(f.pe_fwd||null);const peg=(fpe&&fpe>=3&&fpe<=250&&rc.fwd_growth>=8)?+(fpe/rc.fwd_growth).toFixed(2):null;
      const tr=trend(price,a,b),Q=qL(f.roic,f.eps_g),P=pL(peg),T=tL(tr);
      return {tk,name:f.name,theme:f.theme,price,tr,q:Q,p:P,t:T,
        score:(Q==='g')+(P==='g')+(T==='g'),
