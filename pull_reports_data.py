@@ -27,9 +27,42 @@ def _get(url):
     with urllib.request.urlopen(req, timeout=25) as r:
         return json.loads(r.read())
 
+def slope_200(tk):
+    """Direction of the 200-day average — the primary trend, classic technical-analysis style.
+
+    We measure the 200-day now vs ~one quarter ago and compound-annualize the change, so
+    the % reads as the trend's rate. Classification is purely by DIRECTION, with a small
+    flat deadband so a barely-moving average isn't called a trend (avoids whipsaw):
+      rising  > +2%/yr      falling < -2%/yr      flat / sideways in between
+    Needs ~263 daily closes (200 to average, ending ~63 trading days back). If the
+    history is short, returns (None, None) and the reader falls back to a level-only read.
+    """
+    today = datetime.date.today()
+    start = (today - datetime.timedelta(days=430)).isoformat()   # ~300 trading days of cushion
+    h = _get(f"{FMP}/historical-price-eod/light?symbol={tk}&from={start}&to={today.isoformat()}&apikey={KEY}")
+    rows = h if isinstance(h, list) else h.get("historical") if isinstance(h, dict) else None
+    if not rows:
+        return None, None
+    # ascending by date; each row has 'date' and 'price' (close) on the light endpoint
+    closes = [r.get("price") for r in sorted(rows, key=lambda r: r.get("date","")) if r.get("price") is not None]
+    LOOK = 63                                    # ~one quarter of trading days
+    if len(closes) < 200 + LOOK:
+        return None, None
+    sma = lambda end: sum(closes[end-200:end]) / 200.0
+    now200, past200 = sma(len(closes)), sma(len(closes) - LOOK)
+    if past200 <= 0:
+        return None, None
+    ann = round((( now200 / past200) ** (252.0 / LOOK) - 1) * 100, 1)   # compound-annualized 200-day slope
+    trend = "rising" if ann > 2 else ("falling" if ann < -2 else "sideways")   # direction, small flat deadband
+    return trend, ann
+
 def one(tk):
     q = _get(f"{FMP}/quote?symbol={tk}&apikey={KEY}")
     q = q[0] if isinstance(q, list) and q else {}
+    try:
+        trend200, slope200 = slope_200(tk)
+    except Exception:
+        trend200, slope200 = None, None
     est = _get(f"{FMP}/analyst-estimates?symbol={tk}&period=annual&limit=10&apikey={KEY}")
     fwd_eps = fwd_growth = None
     if isinstance(est, list) and est:
@@ -48,6 +81,7 @@ def one(tk):
         "ma50": q.get("priceAvg50"), "ma200": q.get("priceAvg200"),
         "yearHigh": q.get("yearHigh"), "yearLow": q.get("yearLow"),
         "fwd_eps": fwd_eps, "fwd_growth": fwd_growth,
+        "trend200": trend200, "slope200_ann": slope200,   # primary-trend direction (rising/falling/flat)
         # spot trailing P/E is computed at rebuild time from price / trailing EPS;
         # trailing EPS lives in the quarterly layer, so we publish the raw price here.
     }
