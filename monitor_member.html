@@ -27,6 +27,20 @@ tbody tr:hover{background:#FAFAFF}
 .loading{padding:40px;text-align:center;color:#8a8aa0}.err{padding:16px;background:#FBEAEA;color:#B42318;border-radius:8px}
 .foot{color:#b3b3c2;font-size:11px;margin-top:14px;line-height:1.6}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#8a8aa0;margin:6px 0 0}
+#body{overflow-x:auto}
+/* fit the ~700px iframe on garpify.com/monitor/: below 780px the Theme,
+   PEG and ROIC columns hide (theme lives in the dropdown + grouping;
+   PEG/ROIC are inside the P and Q panels) and paddings tighten. */
+@media (max-width:780px){
+.wrap{padding:12px 10px 28px}
+th,td{padding:8px 6px}
+.nm{display:none}
+th:nth-child(2),td:nth-child(2),
+th:nth-child(9),td:nth-child(9),
+th:nth-child(10),td:nth-child(10){display:none}
+.badge{padding:2px 6px;font-size:10px}
+.pnl{padding:2px 4px;margin:0 1px}
+}
 </style></head><body><div class="wrap">
 <h1>GARPify Monitor</h1>
 <div class="sub">the coverage list &middot; the three cover panels, refreshed through the day</div>
@@ -51,91 +65,91 @@ function trend(p,a,b){return (p>a&&a>b)?'up':(p<a&&a<b)?'dn':'rg';}
 /* Six-category trend: 200-day SLOPE (from the feed) sets the primary trend; price vs 50/200 sets the light. */
 function tCat(p,a,b,t200){if(!p||!a||!b||!t200)return ['rg','a'];var ab=p>a,bb=p>b;if(t200==='rising')return (ab&&bb)?['up','g']:['up','a'];if(t200==='falling')return (!ab&&!bb)?['dn','r']:['dn','a'];return ['rg','a'];}
 /* Q = great company. INTERIM rule (data on hand: book ROIC + earnings growth).
-   Book ROIC alone punishes serial acquirers (goodwill inflates the denominator), so we
-   also credit strong compounding. Green: high return, OR real compounding, OR a solid
-   return paired with growth. Amber: steady but unremarkable. Red: low return AND stalling.
-   Upgrade to return-on-TANGIBLE-capital at the SEC-feed cutover. */
+Book ROIC alone punishes serial acquirers (goodwill inflates the denominator), so we
+also credit strong compounding. Green: high return, OR real compounding, OR a solid
+return paired with growth. Amber: steady but unremarkable. Red: low return AND stalling.
+Upgrade to return-on-TANGIBLE-capital at the SEC-feed cutover. */
 function qL(roic,g){g=g||0;
- if(roic>=15||g>=12||(roic>=10&&g>=7))return 'g';
- if(roic>=8||g>=6)return 'a';
- return 'r';}
+if(roic>=15||g>=12||(roic>=10&&g>=7))return 'g';
+if(roic>=8||g>=6)return 'a';
+return 'r';}
 function pL(peg){if(peg==null)return 'a';return (peg>0&&peg<=1)?'g':(peg>0&&peg<=2)?'a':'r';}
 function pFair(cpe,pe5,peg){if(!cpe||!pe5)return 'a';var r=cpe/pe5;if(r>1.10)return 'r';var pegHigh=(peg!=null&&peg>2);return (r<=0.95&&!pegHigh)?'g':'a';}
 function tL(tr){return tr==='up'?'g':tr==='rg'?'a':'r';}
 function matchScreen(r,f){
- if(f==='all')return true;
- if(f==='three')return r.q==='g'&&r.p==='g'&&r.t==='g';
- if(f==='ondeck')return r.q==='g'&&r.p==='g'&&r.t!=='g';
- if(f==='cooling')return r.q==='g'&&r.p!=='g'&&r.t==='r';
- if(f==='uptrend')return r.tr==='up';
- if(f==='downtrend')return r.tr==='dn';
- if(f==='range')return r.tr==='rg';
- if(f==='discount')return r.roic>=20&&r.fromHi<-15;
- return true;
+if(f==='all')return true;
+if(f==='three')return r.q==='g'&&r.p==='g'&&r.t==='g';
+if(f==='ondeck')return r.q==='g'&&r.p==='g'&&r.t!=='g';
+if(f==='cooling')return r.q==='g'&&r.p!=='g'&&r.t==='r';
+if(f==='uptrend')return r.tr==='up';
+if(f==='downtrend')return r.tr==='dn';
+if(f==='range')return r.tr==='rg';
+if(f==='discount')return r.roic>=20&&r.fromHi<-15;
+return true;
 }
 function inTheme(r){return THEME==='all'||r.theme===THEME;}
 function pass(r){return inTheme(r)&&matchScreen(r,FILTER);}
 function fmt(v,d){return (v==null||isNaN(v))?'—':(+v).toFixed(d);}
 function render(){
- const rows=ROWS.filter(pass).sort((a,b)=>{let x=a[SORT.key],y=b[SORT.key];if(typeof x==='string'){x=x||'';y=y||'';return x<y?-SORT.dir:x>y?SORT.dir:0;}x=(x==null?-1e9:x);y=(y==null?-1e9:y);return (x-y)*SORT.dir;});
- const cols=[['tk','Ticker','l'],['theme','Theme','l'],['panels','Panels','c'],['gr','Guidance','c'],['price','Price'],['tr','Trend'],['vs200','vs 200-day'],['fromHi','from high'],['peg','PEG'],['roic','ROIC']];
- const rowHtml=(r)=>{
-   const bdg=r.tr==='up'?'<span class="badge bup">Uptrend</span>':r.tr==='dn'?'<span class="badge bdn">Downtrend</span>':'<span class="badge brg">Range</span>';
-   const pn=(l,s)=>{const y=s==='g'?'\u2713':s==='a'?'~':'\u2717';const c=s==='g'?'pg':s==='a'?'pa':'pr';return `<span class="pnl ${c}">${l}\u200a${y}</span>`;};
-   const dots=pn('Q',r.q)+pn('P',r.p)+pn('T',r.t);
-   const gd=(()=>{const g=GUID[r.tk];if(!g)return '<span style="color:#c9c6da">\u2014</span>';const arr=(()=>{const d=g.rev;if(!d)return '';const up=d==='raised'||d==='up',dn=d==='lowered'||d==='cut'||d==='down';const ac=up?'#1A6B3C':dn?'#9b2226':'#8a8aa0',ag=up?'\u25B2':dn?'\u25BC':'\u2013';const at=(g.rtip||(up?'Guidance raised vs prior':dn?'Guidance lowered vs prior':'Guidance reaffirmed')).replace(/"/g,'&quot;');return ' <span title="'+at+'" style="color:'+ac+';font-weight:800;cursor:help">'+ag+'</span>';})();if(g.ng)return '<span title="'+(g.tip||'').replace(/"/g,'&quot;')+'" style="color:#b9b7c9;cursor:help">\u2014</span>'+arr;const c=g.r>=0.9?'#1A6B3C':g.r>=0.6?'#8a6d1b':'#9b2226';const gl=g.r>=0.9?'\u2713':g.r>=0.6?'~':'\u2717';return '<span title="'+(g.tip||'').replace(/"/g,'&quot;')+'" style="color:'+c+';font-weight:800;cursor:help">'+gl+'</span><span style="font-size:10px;color:'+c+'">\u200a'+g.n+'/'+g.m+'</span>'+arr;})();
-   return `<tr><td class="l"><span class="tk">${r.tk}</span><div class="nm">${r.name||''}</div></td>
-     <td class="l"><span class="th">${r.theme||''}</span></td>
-     <td class="c">${dots}</td>
-     <td class="c">${gd}</td>
-     <td>$${fmt(r.price,2)}</td><td>${bdg}</td>
-     <td class="${r.vs200>=0?'tg':'tr2'}">${r.vs200>=0?'+':''}${fmt(r.vs200,0)}%</td>
-     <td>${fmt(r.fromHi,0)}%</td>
-     <td class="${(r.peg>0&&r.peg<=1)?'tg':''}">${fmt(r.peg,2)}</td>
-     <td class="${r.roic>=20?'tg':''}">${fmt(r.roic,0)}%</td></tr>`;
- };
- let h='<table><thead><tr>'+cols.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr></thead><tbody>';
- if(GROUP){
-   const order=[...new Set(TICKERS.map(t=>FUND[t].theme))];
-   for(const th of order){
-     const trows=rows.filter(r=>r.theme===th); if(!trows.length)continue;
-     const all=ROWS.filter(r=>r.theme===th);
-     const n3=all.filter(r=>r.q==='g'&&r.p==='g'&&r.t==='g').length;
-     const nd=all.filter(r=>r.q==='g'&&r.p==='g'&&r.t!=='g').length;
-     h+=`<tr><td colspan="${cols.length}" style="background:#F3F2FA;border-top:2px solid #E6E4F0;padding:10px 12px;"><span style="font-weight:800;color:#2D2A6E;font-size:13px;">${th}</span> <span style="color:#8a8aa0;font-size:11.5px;margin-left:8px;">\u2605 ${n3} of ${all.length} clear all three${nd?` \u00b7 ${nd} on deck`:''}</span></td></tr>`;
-     for(const r of trows)h+=rowHtml(r);
-   }
- } else {
-   for(const r of rows)h+=rowHtml(r);
- }
- h+='</tbody></table>';document.getElementById('body').innerHTML=h;
- document.getElementById('count').textContent=rows.length+' of '+ROWS.length+' names';
- chips();
- document.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;SORT.dir=(SORT.key===k?-SORT.dir:1);SORT.key=k;render();});
+const rows=ROWS.filter(pass).sort((a,b)=>{let x=a[SORT.key],y=b[SORT.key];if(typeof x==='string'){x=x||'';y=y||'';return x<y?-SORT.dir:x>y?SORT.dir:0;}x=(x==null?-1e9:x);y=(y==null?-1e9:y);return (x-y)*SORT.dir;});
+const cols=[['tk','Ticker','l'],['theme','Theme','l'],['panels','Panels','c'],['gr','Guidance','c'],['price','Price'],['tr','Trend'],['vs200','vs 200-day'],['fromHi','from high'],['peg','PEG'],['roic','ROIC']];
+const rowHtml=(r)=>{
+const bdg=r.tr==='up'?'<span class="badge bup">Uptrend</span>':r.tr==='dn'?'<span class="badge bdn">Downtrend</span>':'<span class="badge brg">Range</span>';
+const pn=(l,s)=>{const y=s==='g'?'\u2713':s==='a'?'~':'\u2717';const c=s==='g'?'pg':s==='a'?'pa':'pr';return `<span class="pnl ${c}">${l}\u200a${y}</span>`;};
+const dots=pn('Q',r.q)+pn('P',r.p)+pn('T',r.t);
+const gd=(()=>{const g=GUID[r.tk];if(!g)return '<span style="color:#c9c6da">\u2014</span>';const arr=(()=>{const d=g.rev;if(!d)return '';const up=d==='raised'||d==='up',dn=d==='lowered'||d==='cut'||d==='down';const ac=up?'#1A6B3C':dn?'#9b2226':'#8a8aa0',ag=up?'\u25B2':dn?'\u25BC':'\u2013';const at=(g.rtip||(up?'Guidance raised vs prior':dn?'Guidance lowered vs prior':'Guidance reaffirmed')).replace(/"/g,'&quot;');return ' <span title="'+at+'" style="color:'+ac+';font-weight:800;cursor:help">'+ag+'</span>';})();if(g.ng)return '<span title="'+(g.tip||'').replace(/"/g,'&quot;')+'" style="color:#b9b7c9;cursor:help">\u2014</span>'+arr;const c=g.r>=0.9?'#1A6B3C':g.r>=0.6?'#8a6d1b':'#9b2226';const gl=g.r>=0.9?'\u2713':g.r>=0.6?'~':'\u2717';return '<span title="'+(g.tip||'').replace(/"/g,'&quot;')+'" style="color:'+c+';font-weight:800;cursor:help">'+gl+'</span><span style="font-size:10px;color:'+c+'">\u200a'+g.n+'/'+g.m+'</span>'+arr;})();
+return `<tr><td class="l"><span class="tk">${r.tk}</span><div class="nm">${r.name||''}</div></td>
+<td class="l"><span class="th">${r.theme||''}</span></td>
+<td class="c">${dots}</td>
+<td class="c">${gd}</td>
+<td>$${fmt(r.price,2)}</td><td>${bdg}</td>
+<td class="${r.vs200>=0?'tg':'tr2'}">${r.vs200>=0?'+':''}${fmt(r.vs200,0)}%</td>
+<td>${fmt(r.fromHi,0)}%</td>
+<td class="${(r.peg>0&&r.peg<=1)?'tg':''}">${fmt(r.peg,2)}</td>
+<td class="${r.roic>=20?'tg':''}">${fmt(r.roic,0)}%</td></tr>`;
+};
+let h='<table><thead><tr>'+cols.map(c=>`<th class="${c[2]||''}" data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr></thead><tbody>';
+if(GROUP){
+const order=[...new Set(TICKERS.map(t=>FUND[t].theme))];
+for(const th of order){
+const trows=rows.filter(r=>r.theme===th); if(!trows.length)continue;
+const all=ROWS.filter(r=>r.theme===th);
+const n3=all.filter(r=>r.q==='g'&&r.p==='g'&&r.t==='g').length;
+const nd=all.filter(r=>r.q==='g'&&r.p==='g'&&r.t!=='g').length;
+h+=`<tr><td colspan="${cols.length}" style="background:#F3F2FA;border-top:2px solid #E6E4F0;padding:10px 12px;"><span style="font-weight:800;color:#2D2A6E;font-size:13px;">${th}</span> <span style="color:#8a8aa0;font-size:11.5px;margin-left:8px;">\u2605 ${n3} of ${all.length} clear all three${nd?` \u00b7 ${nd} on deck`:''}</span></td></tr>`;
+for(const r of trows)h+=rowHtml(r);
+}
+} else {
+for(const r of rows)h+=rowHtml(r);
+}
+h+='</tbody></table>';document.getElementById('body').innerHTML=h;
+document.getElementById('count').textContent=rows.length+' of '+ROWS.length+' names';
+chips();
+document.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;SORT.dir=(SORT.key===k?-SORT.dir:1);SORT.key=k;render();});
 }
 function chips(){document.getElementById('chips').innerHTML=SCREENS.map(s=>{const n=ROWS.filter(r=>inTheme(r)&&matchScreen(r,s[0])).length;return `<span class="chip ${s[0]==='three'?'star':''} ${s[0]===FILTER?'on':''}" data-f="${s[0]}">${s[1]} <b style="opacity:.65">${n}</b></span>`;}).join('');document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{FILTER=c.dataset.f;chips();render();});}
 async function load(){chips();
- const themes=['all'].concat([...new Set(TICKERS.map(t=>FUND[t].theme))]);const ts=document.getElementById('themeSel');ts.innerHTML=themes.map(x=>`<option value="${x}">${x==='all'?'All themes':x}</option>`).join('');ts.onchange=()=>{THEME=ts.value;render();};
- const gb=document.getElementById('grpBtn');gb.onclick=()=>{GROUP=!GROUP;gb.style.background=GROUP?'#2D2A6E':'#fff';gb.style.color=GROUP?'#fff':'#56546e';render();};
- try{
-   const res=await fetch(DATA_URL,{cache:'no-store'});
-   if(!res.ok) throw new Error('feed HTTP '+res.status);
-   const j=await res.json();
-   let q=j.quotes||[];
-   const bs={};q.forEach(x=>bs[x.symbol]=x);
-   let rd={};try{const rr=await fetch(REPORTS_URL,{cache:'no-store'});if(rr.ok){rd=(await rr.json()).companies||{};}}catch(e){}
-   ROWS=TICKERS.map(tk=>{const m=bs[tk]||{},f=FUND[tk]||{};const price=m.price,a=m.priceAvg50,b=m.priceAvg200,hi=m.yearHigh;
-     const rc=rd[tk]||{};const fpe=(price&&rc.fwd_eps>0)?price/rc.fwd_eps:(f.pe_fwd||null);const peg=(fpe&&fpe>=3&&fpe<=250&&rc.fwd_growth>=8)?+(fpe/rc.fwd_growth).toFixed(2):null;const cpe=(price&&f.eps_ttm>0)?price/f.eps_ttm:null;
-     const tc=tCat(price,a,b,rc.trend200),tr=tc[0],Q=qL(f.roic,f.eps_g),P=pFair(cpe,f.pe5,peg),T=tc[1];
-     return {tk,name:f.name,theme:f.theme,price,tr,q:Q,p:P,t:T,
-       score:(Q==='g')+(P==='g')+(T==='g'),
-       vs200:(price&&b)?100*(price/b-1):null,fromHi:(price&&hi)?100*(price/hi-1):null,peg:peg,roic:f.roic,gr:(GUID[tk]?(GUID[tk].ng?-1:GUID[tk].r):-1)};});
-   const n3=ROWS.filter(r=>r.q==='g'&&r.p==='g'&&r.t==='g');const nd=ROWS.filter(r=>r.q==='g'&&r.p==='g'&&r.t!=='g');
-   document.getElementById('hero').innerHTML=`Every name here has already cleared the great-company bar. The monitor tracks the two things that move &mdash; whether the price is <b>fair</b>, and whether the trend is <b>with you</b>. Sort with the screens below; the number on each shows how many names fit right now. What you do with them is your call.`;
-   const _t=j.asof?new Date(j.asof):null;
-   document.getElementById('asof').textContent=_t?('as of '+_t.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+(j.missing&&j.missing.length?(' · '+j.missing.length+' pending'):'')):'';
-   render();
- }catch(e){document.getElementById('body').innerHTML='<div class="err">Could not reach the market feed. '+(e&&e.message?e.message:e)+'</div>';}
+const themes=['all'].concat([...new Set(TICKERS.map(t=>FUND[t].theme))]);const ts=document.getElementById('themeSel');ts.innerHTML=themes.map(x=>`<option value="${x}">${x==='all'?'All themes':x}</option>`).join('');ts.onchange=()=>{THEME=ts.value;render();};
+const gb=document.getElementById('grpBtn');gb.onclick=()=>{GROUP=!GROUP;gb.style.background=GROUP?'#2D2A6E':'#fff';gb.style.color=GROUP?'#fff':'#56546e';render();};
+try{
+const res=await fetch(DATA_URL,{cache:'no-store'});
+if(!res.ok) throw new Error('feed HTTP '+res.status);
+const j=await res.json();
+let q=j.quotes||[];
+const bs={};q.forEach(x=>bs[x.symbol]=x);
+let rd={};try{const rr=await fetch(REPORTS_URL,{cache:'no-store'});if(rr.ok){rd=(await rr.json()).companies||{};}}catch(e){}
+ROWS=TICKERS.map(tk=>{const m=bs[tk]||{},f=FUND[tk]||{};const price=m.price,a=m.priceAvg50,b=m.priceAvg200,hi=m.yearHigh;
+const rc=rd[tk]||{};const fpe=(price&&rc.fwd_eps>0)?price/rc.fwd_eps:(f.pe_fwd||null);const peg=(fpe&&fpe>=3&&fpe<=250&&rc.fwd_growth>=8)?+(fpe/rc.fwd_growth).toFixed(2):null;const cpe=(price&&f.eps_ttm>0)?price/f.eps_ttm:null;
+const tc=tCat(price,a,b,rc.trend200),tr=tc[0],Q=qL(f.roic,f.eps_g),P=pFair(cpe,f.pe5,peg),T=tc[1];
+return {tk,name:f.name,theme:f.theme,price,tr,q:Q,p:P,t:T,
+score:(Q==='g')+(P==='g')+(T==='g'),
+vs200:(price&&b)?100*(price/b-1):null,fromHi:(price&&hi)?100*(price/hi-1):null,peg:peg,roic:f.roic,gr:(GUID[tk]?(GUID[tk].ng?-1:GUID[tk].r):-1)};});
+const n3=ROWS.filter(r=>r.q==='g'&&r.p==='g'&&r.t==='g');const nd=ROWS.filter(r=>r.q==='g'&&r.p==='g'&&r.t!=='g');
+document.getElementById('hero').innerHTML=`Every name here has already cleared the great-company bar. The monitor tracks the two things that move &mdash; whether the price is <b>fair</b>, and whether the trend is <b>with you</b>. Sort with the screens below; the number on each shows how many names fit right now. What you do with them is your call.`;
+const _t=j.asof?new Date(j.asof):null;
+document.getElementById('asof').textContent=_t?('as of '+_t.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+(j.missing&&j.missing.length?(' · '+j.missing.length+' pending'):'')):'';
+render();
+}catch(e){document.getElementById('body').innerHTML='<div class="err">Could not reach the market feed. '+(e&&e.message?e.message:e)+'</div>';}
 }
 load();
 </script></body></html>
